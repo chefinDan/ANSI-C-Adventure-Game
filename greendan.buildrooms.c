@@ -17,7 +17,7 @@ char const *_dirPfx = "greendan.room.";
 int cleanup(char *, const char *);
 char* replacechar(char *, char, char, size_t);
 DIR* buildDir(char *, char *[]);
-int getConnects(char*);
+char* searchForKey(const char *, const char *);
 
 
 int main(int argc, char const *argv[]) {
@@ -27,13 +27,17 @@ int main(int argc, char const *argv[]) {
   struct stat filedata;
   struct dirent *fileInDir;
   DIR *dir;
-  char *roomNames[] = {"Yeezus_room", "Dirty_Sprite_room",
+  char filename[512];
+  char *roomNames[] = {"Yeezus_room", "Dr._Octagonecologyst",
                        "Lil_Boat_room", "Daytona_room", "Deltron_room",
                        "MFDoom_room", "Supreme_Clientele_room"};
 
-
+  /* concat _dirpfx(greendan.room) with the PID and store in c-string dirName */
   sprintf(dirName, "%s%d", _dirPfx, pid);
 
+  /* call the buildir() function and pass the c-string dirName and the array of roomName pointers */
+  /* buildDir() creates the necessary file structure and populates the room files with */
+  /* information. It returns an open DIR*  */
   dir = buildDir(dirName, roomNames);
   if(dir == NULL){
     printf("%s\n", "error");
@@ -41,44 +45,87 @@ int main(int argc, char const *argv[]) {
     program_invocation_short_name, strerror(errno));
   }
 
-  char filename[512];
-  while((fileInDir = readdir(dir))){
+
+  /* call readdir() on the DIR* returned by buildDir() */
+  /*while((fileInDir = readdir(dir))){
     if(strcmp(fileInDir->d_name, ".") != 0 && strcmp(fileInDir->d_name, "..") != 0){
       sprintf(filename, "%s/%s", dirName, fileInDir->d_name);
-      getConnects(filename);
       memset(filename, '\0', sizeof(filename));
     }
   }
-
+*/
   closedir(dir);
 
   return 0;
 }
 
+void printRoom(char* filename){
 
-int getConnects(char* filename){
-  int count = 0;
-  char line[128];
-  FILE* fp = fopen(filename, "r");
+}
+
+/******************************************************************************
+** Function: searchForKey()
+** Author: Daniel Green
+** Description: this function is passed a char* of an existing filename, and
+*** a char* to a key word that is to be searched for. If found it returns the
+*** address of the first character of the keyword. else it retruns NULL.
+*******************************************************************************/
+char* searchForKey(const char* filename, const char* key){
+  int i, j, found, lineCnt;
+  static char line[64];
+  FILE *fp;
+  const int keylen = strlen(key);
+  const int linelen = strlen(line);
+  char* loc;
+  lineCnt = 0;
+  fp = fopen(filename, "r");
+
+
   while(fgets(line, 64, fp)){
-    printf("%s\n", line);
+
+    lineCnt ++;
+    printf("%s", line);
+
+    for(i=0; i<linelen;i++){
+      found = 1;
+
+      for(j=0;j<keylen;j++){
+        printf("line[%d]:%c key[%d]:%c\n --- line[%d + %d]: %c\n\n",
+                i, line[i], j, key[j], i, j, line[i+j]);
+        if(line[i +j] != key[j]){
+          found = 0;
+          printf("BREAK\n");
+          break;
+        }
+      }
+      if(found == 1){
+        printf("key found on line %d at index: %d\n", lineCnt, i);
+        loc = malloc(keylen *sizeof(char));
+        memcpy(loc, &line[i], keylen);
+
+        return loc;
+      }
+    }
   }
   fclose(fp);
 
-  return count;
+  return NULL;
 }
 
 
 
 /*******************************************************************************
-** Function to make a directory called dirname, and populate it with files
-** whose names are build from the array of char* roomnames.
-**It returns an open DIR*
+** Function: builDir()
+** Author: Daniel Green, greendan@oreonstate.edu
+** Description: This function is passed a char* that will be the name of the
+*** created directory called <dirname>, and populate new directory with files
+*** whose names are build from the array of char* roomnames.
+*** It returns an open DIR* if successful, else it returns NULL.
 *******************************************************************************/
 DIR* buildDir(char *dirname, char *roomnames[]){
   int mkdirRet, i;
   char filepath[64];
-  char connectionX[64] = "CONNECTION X";
+  char connectionX[64] = "CONNECTION:";
   FILE *fp;
   char* noLoDashRmName;
 
@@ -88,6 +135,7 @@ DIR* buildDir(char *dirname, char *roomnames[]){
     printf("%s\n", "error");
     fprintf (stderr, "%s: mkdir(); %s\n",
               program_invocation_short_name, strerror(errno));
+    return NULL;
   }
 
   for(i = 0; i<ROOMS; i++){
@@ -95,21 +143,20 @@ DIR* buildDir(char *dirname, char *roomnames[]){
     sprintf(filepath, "%s/%s", dirname, roomnames[i]);
     fp = fopen(filepath, "a");
     if(i == 0){
-      fprintf(fp, "ROOM NAME: %s\n%s\n%s", noLoDashRmName, connectionX, "ROOM TYPE: START ROOM");
+      fprintf(fp, "ROOM NAME: %s\n%s\n%s\n", noLoDashRmName, connectionX, "ROOM TYPE: START ROOM");
       fclose(fp);
     }
     else if(i == ROOMS-1){
-      fprintf(fp, "ROOM NAME: %s\n%s\n%s", noLoDashRmName, connectionX, "ROOM TYPE: END ROOM");
+      fprintf(fp, "ROOM NAME: %s\n%s\n%s\n", noLoDashRmName, connectionX, "ROOM TYPE: END ROOM");
       fclose(fp);
     }
     else{
-      fprintf(fp, "ROOM NAME: %s\n%s\n%s", noLoDashRmName, connectionX, "ROOM TYPE: MID ROOM");
+      fprintf(fp, "ROOM NAME: %s\n%s\n%s\n", noLoDashRmName, connectionX, "ROOM TYPE: MID ROOM");
       fclose(fp);
     }
     memset(noLoDashRmName, '\0', 32);
     free(noLoDashRmName);
   }
-
 
   return opendir(dirname);
 }
